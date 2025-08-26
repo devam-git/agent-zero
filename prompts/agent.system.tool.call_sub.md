@@ -1,31 +1,32 @@
 ### call_subordinate
 
-you can use subordinates for subtasks
-subordinates can be scientist coder engineer etc
+Create a new subordinate profile or use existing one for subtasks
+Delegate specific subtasks, not entire tasks
+Create new profile for special tasks
+Use existing profiles for generalised tasks
 message field: always describe role, task details goal overview for new subordinate
-delegate specific subtasks not entire task
 reset arg usage:
-  "true": spawn new subordinate
-  "false": continue existing subordinate
-if superior, orchestrate
-respond to existing subordinates using call_subordinate tool with reset false
-profile arg usage: select from available profiles for specialized subordinates, leave empty for default
+  "true": spawn new instance of subordinate (prev memory)
+  "false": continue existing instance subordinate (no prev memory)
+prompt_profile: depedning on the task you can mention the profile of new subordinate to be created or chose from existing profiles
+
+**Important**: Be aware of your current agent profile and do NOT delegate to subordinates with the same profile as yourself. Choose different specialized profiles for subordinates.
 
 example usage
-~~~json
+```json
 {
     "thoughts": [
         "The result seems to be ok but...",
-        "I will ask a coder subordinate to fix...",
+        "I will create a financial analyst subordinate to...",
     ],
     "tool_name": "call_subordinate",
     "tool_args": {
-        "profile": "",
+        "profile": "financial analyst",
         "message": "...",
         "reset": "true"
     }
 }
-~~~
+```
 
 **available profiles:**
 {{agent_profiles}}

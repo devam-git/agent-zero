@@ -82,7 +82,7 @@ async def call_development_function(func: Union[Callable[..., T], Callable[..., 
     if is_development():
         url = _get_rfc_url()
         password = _get_rfc_password()
-        module = files.deabsolute_path(func.__code__.co_filename).replace("/", ".").removesuffix(".py") # __module__ is not reliable
+        module = files.deabsolute_path(func.__code__.co_filename).replace("/", ".").replace("\\", ".").removesuffix(".py") # __module__ is not reliable
         result = await rfc.call_rfc(
             url=url,
             password=password,
