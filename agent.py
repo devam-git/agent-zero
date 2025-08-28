@@ -29,13 +29,14 @@ from python.helpers.extension import call_extensions
 class AgentContextType(Enum):
     USER = "user"
     TASK = "task"
-    MCP = "mcp"
+    BACKGROUND = "background"
 
 
 class AgentContext:
 
     _contexts: dict[str, "AgentContext"] = {}
     _counter: int = 0
+    _notification_manager = None
 
     def __init__(
         self,
@@ -84,6 +85,13 @@ class AgentContext:
     @staticmethod
     def all():
         return list(AgentContext._contexts.values())
+
+    @classmethod
+    def get_notification_manager(cls):
+        if cls._notification_manager is None:
+            from python.helpers.notification import NotificationManager
+            cls._notification_manager = NotificationManager()
+        return cls._notification_manager
 
     @staticmethod
     def remove(id: str):
@@ -213,18 +221,6 @@ class AgentConfig:
     profile: str = ""
     memory_subdir: str = ""
     knowledge_subdirs: list[str] = field(default_factory=lambda: ["default", "custom"])
-    code_exec_docker_enabled: bool = False
-    code_exec_docker_name: str = "A0-dev"
-    code_exec_docker_image: str = "agent0ai/agent-zero-run:development"
-    code_exec_docker_ports: dict[str, int] = field(
-        default_factory=lambda: {"22/tcp": 55022, "80/tcp": 55080}
-    )
-    code_exec_docker_volumes: dict[str, dict[str, str]] = field(
-        default_factory=lambda: {
-            files.get_base_dir(): {"bind": "/a0", "mode": "rw"},
-            files.get_abs_path("work_dir"): {"bind": "/root", "mode": "rw"},
-        }
-    )
     code_exec_ssh_enabled: bool = True
     code_exec_ssh_addr: str = "localhost"
     code_exec_ssh_port: int = 55022
@@ -506,7 +502,7 @@ class Agent:
         ):  # if agent has custom folder, use it and use default as backup
             prompt_dir = files.get_abs_path("agents", self.config.profile, "prompts")
             backup_dir.append(files.get_abs_path("prompts"))
-        prompt = files.read_file(
+        prompt = files.read_prompt_file(
             files.get_abs_path(prompt_dir, file), _backup_dirs=backup_dir, **kwargs
         )
         prompt = files.remove_code_fences(prompt)
@@ -576,6 +572,7 @@ class Agent:
         return models.get_chat_model(
             self.config.chat_model.provider,
             self.config.chat_model.name,
+            model_config=self.config.chat_model,
             **self.config.chat_model.build_kwargs(),
         )
 
@@ -583,6 +580,7 @@ class Agent:
         return models.get_chat_model(
             self.config.utility_model.provider,
             self.config.utility_model.name,
+            model_config=self.config.utility_model,
             **self.config.utility_model.build_kwargs(),
         )
 
@@ -590,6 +588,7 @@ class Agent:
         return models.get_browser_model(
             self.config.browser_model.provider,
             self.config.browser_model.name,
+            model_config=self.config.browser_model,
             **self.config.browser_model.build_kwargs(),
         )
 
@@ -597,6 +596,7 @@ class Agent:
         return models.get_embedding_model(
             self.config.embeddings_model.provider,
             self.config.embeddings_model.name,
+            model_config=self.config.embeddings_model,
             **self.config.embeddings_model.build_kwargs(),
         )
 
@@ -609,15 +609,6 @@ class Agent:
     ):
         model = self.get_utility_model()
 
-        # rate limiter
-        limiter = await self.rate_limiter(
-            self.config.utility_model, f"SYSTEM: {system}\nUSER: {message}", background
-        )
-
-        # add output tokens to rate limiter in tokens callback
-        async def tokens_callback(delta: str, tokens: int):
-            await self.handle_intervention()
-            limiter.add(output=tokens)
 
         # propagate stream to callback if set
         async def stream_callback(chunk: str, total: str):
@@ -628,7 +619,7 @@ class Agent:
             system_message=system,
             user_message=message,
             response_callback=stream_callback,
-            tokens_callback=tokens_callback,
+            rate_limiter_callback=self.rate_limiter_callback if not background else None,
         )
 
         return response
@@ -638,63 +629,29 @@ class Agent:
         messages: list[BaseMessage],
         response_callback: Callable[[str, str], Awaitable[None]] | None = None,
         reasoning_callback: Callable[[str, str], Awaitable[None]] | None = None,
+        background: bool = False,
     ):
         response = ""
 
         # model class
         model = self.get_chat_model()
 
-        # rate limiter
-        limiter = await self.rate_limiter(
-            self.config.chat_model, ChatPromptTemplate.from_messages(messages).format()
-        )
-
-        # add output tokens to rate limiter in tokens callback
-        async def tokens_callback(delta: str, tokens: int):
-            await self.handle_intervention()
-            limiter.add(output=tokens)
-
         # call model
         response, reasoning = await model.unified_call(
             messages=messages,
             reasoning_callback=reasoning_callback,
             response_callback=response_callback,
-            tokens_callback=tokens_callback,
+            rate_limiter_callback=self.rate_limiter_callback if not background else None,
         )
 
         return response, reasoning
 
-    async def rate_limiter(
-        self, model_config: models.ModelConfig, input: str, background: bool = False
+    async def rate_limiter_callback(
+        self, message:str, key:str, total:int, limit:int
     ):
-        # rate limiter log
-        wait_log = None
-
-        async def wait_callback(msg: str, key: str, total: int, limit: int):
-            nonlocal wait_log
-            if not wait_log:
-                wait_log = self.context.log.log(
-                    type="util",
-                    update_progress="none",
-                    heading=msg,
-                    model=f"{model_config.provider}\\{model_config.name}",
-                )
-            wait_log.update(heading=msg, key=key, value=total, limit=limit)
-            if not background:
-                self.context.log.set_progress(msg, -1)
-
-        # rate limiter
-        limiter = models.get_rate_limiter(
-            model_config.provider,
-            model_config.name,
-            model_config.limit_requests,
-            model_config.limit_input,
-            model_config.limit_output,
-        )
-        limiter.add(input=tokens.approximate_tokens(input))
-        limiter.add(requests=1)
-        await limiter.wait(callback=wait_callback)
-        return limiter
+        # show the rate limit waiting in a progress bar, no need to spam the chat history
+        self.context.log.set_progress(message, True)
+        return False
 
     async def handle_intervention(self, progress: str = ""):
         while self.context.paused:

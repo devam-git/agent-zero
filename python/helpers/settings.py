@@ -48,6 +48,9 @@ class Settings(TypedDict):
     browser_model_name: str
     browser_model_api_base: str
     browser_model_vision: bool
+    browser_model_rl_requests: int
+    browser_model_rl_input: int
+    browser_model_rl_output: int
     browser_model_kwargs: dict[str, str]
 
     agent_profile: str
@@ -55,6 +58,7 @@ class Settings(TypedDict):
     agent_knowledge_subdir: str
 
     memory_recall_enabled: bool
+    memory_recall_delayed: bool
     memory_recall_interval: int
     memory_recall_history_len: int
     memory_recall_memories_max_search: int
@@ -67,7 +71,6 @@ class Settings(TypedDict):
     memory_memorize_enabled: bool
     memory_memorize_consolidation: bool
     memory_memorize_replace_threshold: float
-    
 
     api_keys: dict[str, str]
 
@@ -80,6 +83,8 @@ class Settings(TypedDict):
     rfc_password: str
     rfc_port_http: int
     rfc_port_ssh: int
+
+    shell_interface: Literal['local','ssh']
 
     stt_model_size: str
     stt_language: str
@@ -94,6 +99,9 @@ class Settings(TypedDict):
     mcp_client_tool_timeout: int
     mcp_server_enabled: bool
     mcp_server_token: str
+
+    a2a_server_enabled: bool
+    
 
 
 class PartialSettings(Settings, total=False):
@@ -110,7 +118,15 @@ class SettingsField(TypedDict, total=False):
     title: str
     description: str
     type: Literal[
-        "text", "number", "select", "range", "textarea", "password", "switch", "button", "html"
+        "text",
+        "number",
+        "select",
+        "range",
+        "textarea",
+        "password",
+        "switch",
+        "button",
+        "html",
     ]
     value: Any
     min: float
@@ -133,10 +149,10 @@ class SettingsOutput(TypedDict):
 
 
 PASSWORD_PLACEHOLDER = "****PSWD****"
+API_KEY_PLACEHOLDER = "************"
 
 SETTINGS_FILE = files.get_abs_path("tmp/settings.json")
 _settings: Settings | None = None
-
 
 
 def convert_out(settings: Settings) -> SettingsOutput:
@@ -449,6 +465,36 @@ def convert_out(settings: Settings) -> SettingsOutput:
 
     browser_model_fields.append(
         {
+            "id": "browser_model_rl_requests",
+            "title": "Web Browser model rate limit requests",
+            "description": "Rate limit requests for web browser model.",
+            "type": "number",
+            "value": settings["browser_model_rl_requests"],
+        }
+    )
+
+    browser_model_fields.append(
+        {
+            "id": "browser_model_rl_input",
+            "title": "Web Browser model rate limit input",
+            "description": "Rate limit input for web browser model.",
+            "type": "number",
+            "value": settings["browser_model_rl_input"],
+        }
+    )
+
+    browser_model_fields.append(
+        {
+            "id": "browser_model_rl_output",
+            "title": "Web Browser model rate limit output",
+            "description": "Rate limit output for web browser model.",
+            "type": "number",
+            "value": settings["browser_model_rl_output"],
+        }
+    )
+
+    browser_model_fields.append(
+        {
             "id": "browser_model_kwargs",
             "title": "Web Browser model additional parameters",
             "description": "Any other parameters supported by <a href='https://docs.litellm.ai/docs/set_keys' target='_blank'>LiteLLM</a>. Format is KEY=VALUE on individual lines, just like .env file.",
@@ -464,7 +510,6 @@ def convert_out(settings: Settings) -> SettingsOutput:
         "fields": browser_model_fields,
         "tab": "agent",
     }
-
 
     # basic auth section
     auth_fields: list[SettingsField] = []
@@ -530,7 +575,7 @@ def convert_out(settings: Settings) -> SettingsOutput:
     api_keys_section: SettingsSection = {
         "id": "api_keys",
         "title": "API Keys",
-        "description": "API keys for model providers and services used by Agent Zero.",
+        "description": "API keys for model providers and services used by Agent Zero. You can set multiple API keys separated by a comma (,). They will be used in round-robin fashion.",
         "fields": api_keys_fields,
         "tab": "external",
     }
@@ -547,7 +592,8 @@ def convert_out(settings: Settings) -> SettingsOutput:
             "value": settings["agent_profile"],
             "options": [
                 {"value": subdir, "label": subdir}
-                for subdir in files.get_subdirectories("agents") if subdir != "_example"
+                for subdir in files.get_subdirectories("agents")
+                if subdir != "_example"
             ],
         }
     )
@@ -574,7 +620,6 @@ def convert_out(settings: Settings) -> SettingsOutput:
         "tab": "agent",
     }
 
-
     memory_fields: list[SettingsField] = []
 
     memory_fields.append(
@@ -598,6 +643,16 @@ def convert_out(settings: Settings) -> SettingsOutput:
             "description": "Agent Zero will automatically recall memories based on convesation context.",
             "type": "switch",
             "value": settings["memory_recall_enabled"],
+        }
+    )
+
+    memory_fields.append(
+        {
+            "id": "memory_recall_delayed",
+            "title": "Memory auto-recall delayed",
+            "description": "The agent will not wait for auto memory recall. Memories will be delivered one message later. This speeds up agent's response time but may result in less relevant first step.",
+            "type": "switch",
+            "value": settings["memory_recall_delayed"],
         }
     )
 
@@ -740,6 +795,17 @@ def convert_out(settings: Settings) -> SettingsOutput:
 
     dev_fields: list[SettingsField] = []
 
+    dev_fields.append(
+        {
+            "id": "shell_interface",
+            "title": "Shell Interface",
+            "description": "Terminal interface used for Code Execution Tool. Local Python TTY works locally in both dockerized and development environments. SSH always connects to dockerized environment (automatically at localhost or RFC host address).",
+            "type": "select",
+            "value": settings["shell_interface"],
+            "options": [{"value": "local", "label": "Local Python TTY"}, {"value": "ssh", "label": "SSH"}],
+        }
+    )
+
     if runtime.is_development():
         # dev_fields.append(
         #     {
@@ -803,6 +869,46 @@ def convert_out(settings: Settings) -> SettingsOutput:
         "fields": dev_fields,
         "tab": "developer",
     }
+
+    # code_exec_fields: list[SettingsField] = []
+
+    # code_exec_fields.append(
+    #     {
+    #         "id": "code_exec_ssh_enabled",
+    #         "title": "Use SSH for code execution",
+    #         "description": "Code execution will use SSH to connect to the terminal. When disabled, a local python terminal interface is used instead. SSH should only be used in development environment or when encountering issues with the local python terminal interface.",
+    #         "type": "switch",
+    #         "value": settings["code_exec_ssh_enabled"],
+    #     }
+    # )
+
+    # code_exec_fields.append(
+    #     {
+    #         "id": "code_exec_ssh_addr",
+    #         "title": "Code execution SSH address",
+    #         "description": "Address of the SSH server for code execution. Only applies when SSH is enabled.",
+    #         "type": "text",
+    #         "value": settings["code_exec_ssh_addr"],
+    #     }
+    # )
+
+    # code_exec_fields.append(
+    #     {
+    #         "id": "code_exec_ssh_port",
+    #         "title": "Code execution SSH port",
+    #         "description": "Port of the SSH server for code execution. Only applies when SSH is enabled.",
+    #         "type": "text",
+    #         "value": settings["code_exec_ssh_port"],
+    #     }
+    # )
+
+    # code_exec_section: SettingsSection = {
+    #     "id": "code_exec",
+    #     "title": "Code execution",
+    #     "description": "Configuration of code execution by the agent.",
+    #     "fields": code_exec_fields,
+    #     "tab": "developer",
+    # }
 
     # Speech to text section
     stt_fields: list[SettingsField] = []
@@ -880,7 +986,7 @@ def convert_out(settings: Settings) -> SettingsOutput:
 
     # TTS fields
     tts_fields: list[SettingsField] = []
-    
+
     tts_fields.append(
         {
             "id": "tts_kokoro",
@@ -957,7 +1063,7 @@ def convert_out(settings: Settings) -> SettingsOutput:
         {
             "id": "mcp_server_enabled",
             "title": "Enable A0 MCP Server",
-            "description": "Expose Agent Zero as an SSE MCP server. This will make this A0 instance available to MCP clients.",
+            "description": "Expose Agent Zero as an SSE/HTTP MCP server. This will make this A0 instance available to MCP clients.",
             "type": "switch",
             "value": settings["mcp_server_enabled"],
         }
@@ -980,6 +1086,50 @@ def convert_out(settings: Settings) -> SettingsOutput:
         "description": "Agent Zero can be exposed as an SSE MCP server. See <a href=\"javascript:openModal('settings/mcp/server/example.html')\">connection example</a>.",
         "fields": mcp_server_fields,
         "tab": "mcp",
+    }
+
+    # -------- A2A Section --------
+    a2a_fields: list[SettingsField] = []
+
+    a2a_fields.append(
+        {
+            "id": "a2a_server_enabled",
+            "title": "Enable A2A server",
+            "description": "Expose Agent Zero as A2A server. This allows other agents to connect to A0 via A2A protocol.",
+            "type": "switch",
+            "value": settings["a2a_server_enabled"],
+        }
+    )
+
+    a2a_section: SettingsSection = {
+        "id": "a2a_server",
+        "title": "A0 A2A Server",
+        "description": "Agent Zero can be exposed as an A2A server. See <a href=\"javascript:openModal('settings/a2a/a2a-connection.html')\">connection example</a>.",
+        "fields": a2a_fields,
+        "tab": "mcp",
+    }
+
+
+    # External API section
+    external_api_fields: list[SettingsField] = []
+
+    external_api_fields.append(
+        {
+            "id": "external_api_examples",
+            "title": "API Examples",
+            "description": "View examples for using Agent Zero's external API endpoints with API key authentication.",
+            "type": "button",
+            "value": "Show API Examples",
+        }
+    )
+
+    external_api_section: SettingsSection = {
+        "id": "external_api",
+        "title": "External API",
+        "description": "Agent Zero provides external API endpoints for integration with other applications. "
+                       "These endpoints use API key authentication and support text messages and file attachments.",
+        "fields": external_api_fields,
+        "tab": "external",
     }
 
     # Backup & Restore section
@@ -1030,8 +1180,11 @@ def convert_out(settings: Settings) -> SettingsOutput:
             auth_section,
             mcp_client_section,
             mcp_server_section,
+            a2a_section,
+            external_api_section,
             backup_section,
             dev_section,
+            # code_exec_section,
         ]
     }
     return result
@@ -1039,11 +1192,12 @@ def convert_out(settings: Settings) -> SettingsOutput:
 
 def _get_api_key_field(settings: Settings, provider: str, title: str) -> SettingsField:
     key = settings["api_keys"].get(provider, models.get_api_key(provider))
+    # For API keys, use simple asterisk placeholder for existing keys
     return {
         "id": f"api_key_{provider}",
         "title": title,
-        "type": "password",
-        "value": (PASSWORD_PLACEHOLDER if key and key != "None" else ""),
+        "type": "text",
+        "value": (API_KEY_PLACEHOLDER if key and key != "None" else ""),
     }
 
 
@@ -1052,7 +1206,13 @@ def convert_in(settings: dict) -> Settings:
     for section in settings["sections"]:
         if "fields" in section:
             for field in section["fields"]:
-                if field["value"] != PASSWORD_PLACEHOLDER:
+                # Skip saving if value is a placeholder
+                should_skip = (
+                    field["value"] == PASSWORD_PLACEHOLDER or
+                    field["value"] == API_KEY_PLACEHOLDER
+                )
+
+                if not should_skip:
                     if field["id"].endswith("_kwargs"):
                         current[field["id"]] = _env_to_dict(field["value"])
                     elif field["id"].startswith("api_key_"):
@@ -1094,7 +1254,7 @@ def normalize_settings(settings: Settings) -> Settings:
     # adjust settings values to match current version if needed
     if "version" not in copy or copy["version"] != default["version"]:
         _adjust_to_version(copy, default)
-        copy["version"] = default["version"] # sync version
+        copy["version"] = default["version"]  # sync version
 
     # remove keys that are not in default
     keys_to_remove = [key for key in copy if key not in default]
@@ -1109,7 +1269,7 @@ def normalize_settings(settings: Settings) -> Settings:
             try:
                 copy[key] = type(value)(copy[key])  # type: ignore
                 if isinstance(copy[key], str):
-                    copy[key] = copy[key].strip() # strip strings
+                    copy[key] = copy[key].strip()  # strip strings
             except (ValueError, TypeError):
                 copy[key] = value  # make default instead
 
@@ -1126,6 +1286,7 @@ def _adjust_to_version(settings: Settings, default: Settings):
         if "agent_profile" not in settings or settings["agent_profile"] == "default":
             settings["agent_profile"] = "agent0"
 
+
 def _read_settings_file() -> Settings | None:
     if os.path.exists(SETTINGS_FILE):
         content = files.read_file(SETTINGS_FILE)
@@ -1134,6 +1295,7 @@ def _read_settings_file() -> Settings | None:
 
 
 def _write_settings_file(settings: Settings):
+    settings = settings.copy()
     _write_sensitive_settings(settings)
     _remove_sensitive_settings(settings)
 
@@ -1199,8 +1361,12 @@ def get_default_settings() -> Settings:
         browser_model_name="openai/gpt-4.1",
         browser_model_api_base="",
         browser_model_vision=True,
+        browser_model_rl_requests=0,
+        browser_model_rl_input=0,
+        browser_model_rl_output=0,
         browser_model_kwargs={"temperature": "0"},
         memory_recall_enabled=True,
+        memory_recall_delayed=False,
         memory_recall_interval=3,
         memory_recall_history_len=10000,
         memory_recall_memories_max_search=12,
@@ -1225,6 +1391,7 @@ def get_default_settings() -> Settings:
         rfc_password="",
         rfc_port_http=55080,
         rfc_port_ssh=55022,
+        shell_interface="local" if runtime.is_dockerized() else "ssh",
         stt_model_size="base",
         stt_language="en",
         stt_silence_threshold=0.3,
@@ -1236,6 +1403,7 @@ def get_default_settings() -> Settings:
         mcp_client_tool_timeout=120,
         mcp_server_enabled=False,
         mcp_server_token=create_auth_token(),
+        a2a_server_enabled=False,
     )
 
 
@@ -1333,6 +1501,18 @@ def _apply_settings(previous: Settings | None):
                 update_mcp_token, current_token
             )  # TODO overkill, replace with background task
 
+        # update token in a2a server
+        if not previous or current_token != previous["mcp_server_token"]:
+
+            async def update_a2a_token(token: str):
+                from python.helpers.fasta2a_server import DynamicA2AProxy
+
+                DynamicA2AProxy.get_instance().reconfigure(token=token)
+
+            task4 = defer.DeferredTask().start_task(
+                update_a2a_token, current_token
+            )  # TODO overkill, replace with background task
+
 
 def _env_to_dict(data: str):
     env_dict = {}
@@ -1373,9 +1553,9 @@ def set_root_password(password: str):
 def get_runtime_config(set: Settings):
     if runtime.is_dockerized():
         return {
+            "code_exec_ssh_enabled": set["shell_interface"] == "ssh",
             "code_exec_ssh_addr": "localhost",
             "code_exec_ssh_port": 22,
-            "code_exec_http_port": 80,
             "code_exec_ssh_user": "root",
         }
     else:
@@ -1387,9 +1567,9 @@ def get_runtime_config(set: Settings):
         if host.endswith("/"):
             host = host[:-1]
         return {
+            "code_exec_ssh_enabled": set["shell_interface"] == "ssh",
             "code_exec_ssh_addr": host,
             "code_exec_ssh_port": set["rfc_port_ssh"],
-            "code_exec_http_port": set["rfc_port_http"],
             "code_exec_ssh_user": "root",
         }
 
