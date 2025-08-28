@@ -52,6 +52,14 @@ class Todo(Tool):
             self.update_task(title, description, parent, notes, done)
             return Response(message=f"Updated task. Here is the list:\n{self.print_list()}", break_loop=False)
         
+        elif action == "bulk_add":
+            todos = self.args.get("todos", [])
+            clear_first = self.args.get("clear_first", "true").lower() == "true"
+            if clear_first:
+                self.clear()
+            self.bulk_add_tasks(todos)
+            return Response(message=f"Added {len(todos)} tasks. Here is the list:\n{self.print_list()}", break_loop=False)
+        
         elif action == "list":
             content = self.print_list()
             return Response(message=f"To-Do List:\n{content}", break_loop=False)
@@ -74,6 +82,21 @@ class Todo(Tool):
         else:
             lines.append(task_line)
 
+        self._write(lines)
+
+    def bulk_add_tasks(self, todos: list):
+        lines = self._read()
+        for todo in todos:
+            if isinstance(todo, str):
+                task_line = f"- [ ] {todo}"
+            else:
+                title = todo.get("title", "")
+                description = todo.get("description", "")
+                notes = todo.get("notes", "")
+                task_line = f"- [ ] {title}" + (f" — {description}" if description else "")
+                if notes:
+                    task_line += f"\n  {notes}"
+            lines.append(task_line)
         self._write(lines)
 
     def update_task(self, title: str, description: str = "", parent: str = None, notes: str = "", done: bool = False):

@@ -2,87 +2,95 @@
 Manage tasks and subtasks in a simple txt-based to-do list for structured planning and progress tracking. Each agent has its own persistent file (todo.txt), with support for adding, completing, uncompleting, deleting, clearing, and listing tasks.
 
 **When to use**:
-Use this tool when you are solving a complex problem with structured planning. Keep creatinf=g, managing and updating tasks (parent/subtask).
-And keep refering to the list to keep track of your objectives.
+- **Complex multi-step problems**: Break down into manageable tasks with clear tracking
+- **Conversation start**: Use `bulk_add` to quickly establish all required tasks
+- **Progress tracking**: Regular `update` calls to mark completion and add notes
+- **Plan changes**: Use `delete` for obsolete tasks, `add` for new requirements
 
 **Parameters**:
 - action: str
-The operation to perform. Possible values are: "add", "update", "delete", "clear", "list".
+Operations: "add", "update", "delete", "clear", "list", "bulk_add"
 
-- title: str (optional but usually required)
-The title of the task to add, complete, uncomplete, or delete.
+- title: str (required for add/update/delete)
+Task title for individual operations
 
 - description: str (optional)
-Details for a task when creating it.
+Task details and context
 
 - notes: str (optional)
-Additonal notes about a task and its solving.
+Additional notes and progress logs
 
 - parent: str (optional)
-The title of an existing task to nest a new subtask under.
+Parent task title for creating subtasks
 
-- done: bool
-status of the task, "true" if completed, "else" false.
+- done: bool (optional)
+Task completion status (true/false)
+
+- todos: list (required for bulk_add)
+List of tasks - can be strings or objects with {title, description, notes}
+
+- clear_first: str (optional, default "true")
+Whether to clear existing todos before bulk adding
 
 - reset: str (optional)
-"true" if you want to use a fresh new todo list (for new topics/conversations)
-"false" if you want to use the same existing list (for same topics/conversations)
-
-Strictly set reset="true" for a new conversation or a conversation on a seperate topic
+"true" for new conversations/topics, "false" to continue existing work
 
 **Actions**:
-- add: Creates a new top-level task, or a subtask if parent is provided. Requires title.
-- update: Update the status or add any logs/notes to the task. Requires title.
-- delete: Removes a task (and any subtasks under it). Requires title.
-- clear: Clears all tasks from the list. No parameters required.
-- list: Returns the full to-do list as text. No parameters required.
+- **bulk_add**: Clear list and add multiple tasks at once. Use at conversation start.
+- **add**: Single task creation. Use for new requirements during work.
+- **update**: Mark done or add progress notes. Use frequently to track completion.
+- **delete**: Remove obsolete tasks. Use when plans change.
+- **clear**: Reset entire list. Use sparingly.
+- **list**: View current todos. Use to stay oriented.
 
 **Storage**:
 Tasks are stored in a markdown file (todo.txt) inside an agent-specific directory under data/.
 
-**Usage**:
+**Usage Examples**:
+
+**Start conversation with multiple tasks:**
 ```json
 {
-    "thoughts": [
-        "This looks like a new project, so I should add a main task."
-    ],
-    "headline": "Adding a top-level task",
     "tool_name": "todo_list",
     "tool_args": {
-        "action": "add",
-        "title": "Prepare quarterly business report",
-        "description": "Compile and analyze revenue and expense data"
-    }
-}
-{
-    "thoughts": [
-        "Now I'll add a subtask under the report task."
-    ],
-    "headline": "Adding a subtask",
-    "tool_name": "todo_list",
-    "tool_args": {
-        "action": "add",
-        "parent": "Prepare quarterly business report",
-        "title": "Collect revenue data",
-        "description": "Gather revenue figures from all departments"
-    }
-}
-{
-    "thoughts": [
-        "The first subtask is complete, I should mark it as done."
-    ],
-    "headline": "Completing a subtask",
-    "tool_name": "todo_list",
-    "tool_args": {
-        "action": "update",
-        "title": "Collect revenue data",
-        "done" : true
+        "action": "bulk_add",
+        "todos": [
+            "Analyze user requirements",
+            {"title": "Design database schema", "description": "Create tables for users and orders"},
+            {"title": "Implement API endpoints", "notes": "Focus on authentication first"}
+        ]
     }
 }
 ```
 
-**Tips**:
-- Complete all to-dos in the list for success criteria
-- Can change the list if you find a better plan/approach or stuck on one problem
-- Regularly refer the to-do for objectives and keep updating the status 
-- Use the notes field for important content regarding that task
+**Add single task:**
+```json
+{
+    "tool_name": "todo_list",
+    "tool_args": {
+        "action": "add",
+        "title": "Fix login bug",
+        "parent": "Implement API endpoints"
+    }
+}
+```
+
+**Mark task complete:**
+```json
+{
+    "tool_name": "todo_list",
+    "tool_args": {
+        "action": "update",
+        "title": "Analyze user requirements",
+        "done": true,
+        "notes": "Found 3 core features needed"
+    }
+}
+```
+
+**Best Practices**:
+- **Start fast**: Use `bulk_add` at conversation beginning to establish all tasks
+- **Stay current**: Mark tasks done immediately upon completion with progress notes
+- **Adapt quickly**: Delete obsolete tasks when requirements change
+- **Track progress**: Use notes field for important findings and context
+- **Stay focused**: Regularly `list` to review objectives and remaining work
