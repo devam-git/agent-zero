@@ -159,17 +159,13 @@ Create deeper hierarchies by making agents that are both tools and managers:
 
 ## Common Use Cases
 
-### Content Production Pipeline
-- Research Agent → Analysis Agent → Writing Agent → Editor Agent
+- **Content Production Pipeline**: Research Agent → Analysis Agent → Writing Agent → Editor Agent
 
-### Customer Service Hierarchy  
-- Triage Agent → Specialist Agents (Billing, Technical, Sales)
+- **Customer Service Hierarchy**: Triage Agent → Specialist Agents (Billing, Technical, Sales)
 
-### Data Processing Workflow
-- Ingestion Agent → Processing Agent → Analysis Agent → Reporting Agent
+- **Data Processing Workflow**: Ingestion Agent → Processing Agent → Analysis Agent → Reporting Agent
 
-### Development Team Simulation
-- Project Manager Agent → Developer Agents → QA Agent → Documentation Agent
+- **Development Team Simulation**: Project Manager Agent → Developer Agents → QA Agent → Documentation Agent
 
 ## Troubleshooting
 

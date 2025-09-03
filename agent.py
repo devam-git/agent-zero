@@ -14,6 +14,7 @@ import models
 from python.helpers import extract_tools, files, errors, history, tokens
 from python.helpers import dirty_json
 from python.helpers.print_style import PrintStyle
+from python.helpers.langfuse_tracer import trace_conversation_async
 from langchain_core.prompts import (
     ChatPromptTemplate,
 )
@@ -420,7 +421,7 @@ class Agent:
             False,
             content=self.read_prompt(
                 "agent.context.extras.md",
-                extras=dirty_json.stringify(
+                extras=self._format_extras_readable(
                     {**loop_data.extras_persistent, **loop_data.extras_temporary}
                 ),
             ),
@@ -493,6 +494,18 @@ class Agent:
             files.get_abs_path(prompt_dir, file), _backup_dirs=backup_dir, **kwargs
         )
         return prompt
+
+    def _format_extras_readable(self, extras_dict: dict) -> str:
+        if not extras_dict:
+            return "None"
+        
+        formatted = []
+        for key, value in extras_dict.items():
+            # Clean up the key for better readability
+            clean_key = key.replace('_', ' ').title()
+            formatted.append(f"## {clean_key}\n{value}")
+        
+        return "\n\n".join(formatted)
 
     def read_prompt(self, file: str, **kwargs) -> str:
         prompt_dir = files.get_abs_path("prompts")

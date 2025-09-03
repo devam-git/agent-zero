@@ -1,6 +1,0 @@
-# To-Do List
-- [x] Research on AI advancements
-  Completed research and gathered all necessary information.
-- [ ] Write a report on AI — Include recent trends and future predictions
-- [ ] Prepare presentation slides
-  Focus on key AI technologies

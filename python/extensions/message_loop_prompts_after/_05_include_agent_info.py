@@ -11,5 +11,5 @@ class IncludeAgentInfo(Extension):
             profile=self.agent.config.profile or "Default",
         )
 
-        # add agent info to the prompt
-        loop_data.extras_temporary["agent_info"] = agent_info_prompt
+        # add agent info to system prompt instead of extras
+        loop_data.system.insert(0, "\n" + agent_info_prompt)

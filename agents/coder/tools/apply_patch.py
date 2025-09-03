@@ -32,3 +32,4 @@ class ApplyPatch(Tool):
             return Response(message=f"Error applying patch: {e}", break_loop=False)
         finally:
             os.remove(patch_filename)
+            

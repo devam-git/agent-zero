@@ -43,13 +43,88 @@ builder.save("custom_workflow.json")
 
 ```
 
-## Component Reference
+## Core Methods
 
-📖 **See "Component Reference" section for complete component documentation** including:
-- All available component types and configurations
-- Input/output handles and types  
-- Connection patterns and examples
-- Best practices for each component
+### `LangflowBuilder(name, description, **kwargs)`
+- **Args**: `name` (str), `description` (str)
+- **Kwargs**: `workflow_name`, `auto_position=True` (default), `spacing=650`
+
+### `add_component(id, type, config, position, **kwargs)`
+- **Args**: `id` (str), `type` (str), `config` (dict), `position` (tuple, optional)
+- **Kwargs**: `component_type`, `x`, `y`, `pos`, direct config fields
+- **Auto Layout**: Position calculated automatically if not specified
+
+### `add_dynamic_prompt(id, template, field_configs, position, **kwargs)`
+- **Args**: `id` (str), `template` (str), `field_configs` (dict), `position` (tuple, optional)  
+- **Kwargs**: `prompt_template`, `fields`, `x`, `y`, `pos`
+- **Auto Layout**: Position calculated automatically if not specified
+
+### `connect(from_id, to_id, from_output, to_input, **kwargs)`
+- **Args**: `from_id` (str), `to_id` (str), `from_output` (str), `to_input` (str)
+- **Kwargs**: `source`, `target`, `source_output`, `target_input`
+
+### `add_note(content, position, color, **kwargs)`
+- **Args**: `content` (str), `position` (tuple, optional), `color` (str)
+- **Kwargs**: `text`, `note_text`, `x`, `y`, `pos`, `note_color`
+- **Auto Layout**: Position calculated automatically if not specified
+
+### `build() -> dict`
+Returns complete Langflow JSON workflow.
+
+## Auto Layout (Default Behavior)
+
+The builder automatically positions components left-to-right with smart spacing:
+- **Default**: `auto_position=True`, `spacing=650`
+- **Components**: Positioned horizontally at y=300
+- **Notes**: Positioned at top (y=50) to avoid overlap
+- **Override**: Set explicit `x`, `y` coordinates to override auto-positioning
+- **Disable**: Set `auto_position=False` for manual positioning only
+
+## Field Config Options
+
+```python
+field_configs = {
+    "variable_name": {
+        "input_types": ["Message"],  # CRITICAL
+        "display_name": "User Label",
+        "required": True,
+        "multiline": True,
+        "options": ["opt1", "opt2"],  # For dropdowns
+        "info": "Help text",
+        "placeholder": "Example..."
+    }
+}
+```
+
+## Helper Methods
+
+### `create_compatible_field_config(display_name, **kwargs)`
+Creates guaranteed-compatible field configurations:
+```python
+field_config = LangflowBuilder.create_compatible_field_config(
+    display_name="User Input",
+    info="Help text",
+    required=True,
+    options=["opt1", "opt2"]  # Optional dropdown
+)
+```
+
+## Keyword Arguments
+
+All methods support kwargs for cleaner code:
+- Use `id`/`name` instead of positional logical_id
+- Use `component_type` instead of positional type  
+- Use `x`, `y` for positioning (overrides auto layout)
+- Use `source`/`target` for connections
+- Pass config fields directly as kwargs
+
+## Connection Patterns
+
+```
+ChatInput.message → Prompt.{field} → LanguageModel.input_value → ChatOutput.input_value
+```
+
+**For detailed component specifications, see "Component Reference" section.**
 
 ## Complex Workflow Examples
 
@@ -227,86 +302,3 @@ builder.connect("synthesis_llm", "final_output")
 - **Mixed LLM Strategy**: Different models for different complexity levels (GPT-4o for planning/synthesis, GPT-4o-mini for analysis)
 - **Flexible Connections**: Auto-detection and explicit handle specification
 - **Helper Methods**: `create_compatible_field_config()` for guaranteed compatibility
-
-## Core Methods
-
-### `LangflowBuilder(name, description, **kwargs)`
-- **Args**: `name` (str), `description` (str)
-- **Kwargs**: `workflow_name`, `auto_position=True` (default), `spacing=650`
-
-### `add_component(id, type, config, position, **kwargs)`
-- **Args**: `id` (str), `type` (str), `config` (dict), `position` (tuple, optional)
-- **Kwargs**: `component_type`, `x`, `y`, `pos`, direct config fields
-- **Auto Layout**: Position calculated automatically if not specified
-
-### `add_dynamic_prompt(id, template, field_configs, position, **kwargs)`
-- **Args**: `id` (str), `template` (str), `field_configs` (dict), `position` (tuple, optional)  
-- **Kwargs**: `prompt_template`, `fields`, `x`, `y`, `pos`
-- **Auto Layout**: Position calculated automatically if not specified
-
-### `connect(from_id, to_id, from_output, to_input, **kwargs)`
-- **Args**: `from_id` (str), `to_id` (str), `from_output` (str), `to_input` (str)
-- **Kwargs**: `source`, `target`, `source_output`, `target_input`
-
-### `add_note(content, position, color, **kwargs)`
-- **Args**: `content` (str), `position` (tuple, optional), `color` (str)
-- **Kwargs**: `text`, `note_text`, `x`, `y`, `pos`, `note_color`
-- **Auto Layout**: Position calculated automatically if not specified
-
-### `build() -> dict`
-Returns complete Langflow JSON workflow.
-
-## Auto Layout (Default Behavior)
-
-The builder automatically positions components left-to-right with smart spacing:
-- **Default**: `auto_position=True`, `spacing=650`
-- **Components**: Positioned horizontally at y=300
-- **Notes**: Positioned at top (y=50) to avoid overlap
-- **Override**: Set explicit `x`, `y` coordinates to override auto-positioning
-- **Disable**: Set `auto_position=False` for manual positioning only
-
-## Field Config Options
-
-```python
-field_configs = {
-    "variable_name": {
-        "input_types": ["Message"],  # CRITICAL
-        "display_name": "User Label",
-        "required": True,
-        "multiline": True,
-        "options": ["opt1", "opt2"],  # For dropdowns
-        "info": "Help text",
-        "placeholder": "Example..."
-    }
-}
-```
-
-## Helper Methods
-
-### `create_compatible_field_config(display_name, **kwargs)`
-Creates guaranteed-compatible field configurations:
-```python
-field_config = LangflowBuilder.create_compatible_field_config(
-    display_name="User Input",
-    info="Help text",
-    required=True,
-    options=["opt1", "opt2"]  # Optional dropdown
-)
-```
-
-## Keyword Arguments
-
-All methods support kwargs for cleaner code:
-- Use `id`/`name` instead of positional logical_id
-- Use `component_type` instead of positional type  
-- Use `x`, `y` for positioning (overrides auto layout)
-- Use `source`/`target` for connections
-- Pass config fields directly as kwargs
-
-## Connection Patterns
-
-```
-ChatInput.message → Prompt.{field} → LanguageModel.input_value → ChatOutput.input_value
-```
-
-📖 **For detailed component specifications, see "Component Reference" section.**

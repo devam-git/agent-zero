@@ -9,7 +9,20 @@
       "Read(/c:\\devam\\agent-zero\\python\\tools/**)",
       "Bash(git remote add:*)",
       "Bash(git fetch:*)",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "Bash(find:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "WebSearch",
+      "WebFetch(domain:langfuse.com)",
+      "WebFetch(domain:github.com)",
+      "Read(c:\\devam\\agent-zero\\agents\\info_extractor\\prompts/**)",
+      "Read(c:\\devam\\agent-zero\\agents\\info_extractor\\prompts/**)",
+      "Read(c:\\devam\\agent-zero\\prompts/**)",
+      "Read(c:\\devam\\agent-zero\\agents\\info_extractor\\prompts/**)",
+      "Read(c:\\devam\\agent-zero\\agents\\info_extractor\\prompts/**)",
+      "Read(c:\\devam\\agent-zero\\agents\\unspc_classifier\\prompts/**)",
+      "Read(c:\\devam\\agent-zero\\agents\\unspc_classifier\\prompts/**)"
     ],
     "deny": [],
     "ask": []

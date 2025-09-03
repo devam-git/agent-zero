@@ -10,7 +10,11 @@ reset arg usage:
   "false": continue existing instance subordinate (no prev memory)
 prompt_profile: depedning on the task you can mention the profile of new subordinate to be created or chose from existing profiles
 
-**Important**: Be aware of your current agent profile and do NOT delegate to subordinates with the same profile as yourself. Choose different specialized profiles for subordinates.
+**CRITICAL RULE**: 
+- **YOUR CURRENT PROFILE: {{profile}}**
+- **NEVER delegate to subordinates with profile "{{profile}}" - this will cause infinite recursion**
+- **ALWAYS choose a DIFFERENT specialized profile for subordinates**
+- **If task matches your current specialization, handle it yourself instead of delegating**
 
 example usage
 ```json
@@ -27,6 +31,9 @@ example usage
     }
 }
 ```
+**Current Agent Info**:
+Agent Number: {{number}}
+Profile: {{profile}}
 
-**available profiles:**
+**Available profiles:**
 {{agent_profiles}}
