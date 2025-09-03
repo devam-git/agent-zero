@@ -22,18 +22,17 @@ class UNSPC_ClassifierTools(VariablesPlugin):
         
         # Define allowed default tools for UNSPC_Classifier
         allowed_tools = [
-            'response',
             'code_exe',
-            'search_engine',
             'document_query',
-            'vision_load'
+            'response',
+            'search_engine',
         ]
         
         print(f"📝 Filtering tools for UNSPC_Classifier profile")
         filtered_files = []
         for pf in prompt_files:
             tool_name = os.path.basename(pf)[18:-3]  # Extract tool name from agent.system.tool.NAME.md
-            if "UNSPC_Classifier" in pf:
+            if "unspc_classifier" in pf:
                 # print(f"   ✅ Including UNSPC_Classifier tool: {tool_name}")
                 filtered_files.append(pf)
             elif tool_name in allowed_tools:

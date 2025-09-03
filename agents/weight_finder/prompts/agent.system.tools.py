@@ -22,11 +22,9 @@ class WeightFinderTools(VariablesPlugin):
         
         # Define allowed default tools for weight_finder
         allowed_tools = [
-            'response',
-            'document_query',
-            'vision_load',
             'code_exe',
-            'knowledge_tool'
+            'document_query',
+            'response',
         ]
         
         print(f"📝 Filtering tools for weight_finder profile")

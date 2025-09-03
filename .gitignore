@@ -4,8 +4,10 @@
 **/__pycache__/
 **/.conda/
 
-#Ignore cursor rules
+#Ignore cursor adn claude rules
 .cursor/
+.claude/
+.vscode/
 
 # ignore test files in root dir
 /*.test.py

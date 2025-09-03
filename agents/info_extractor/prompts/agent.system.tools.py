@@ -22,11 +22,11 @@ class InfoExtractorTools(VariablesPlugin):
         
         # Define allowed default tools for info_extractor
         allowed_tools = [
-            'response',
             'document_query',
             'memory',
-            'vision_load'
+            'response'
         ]
+        # vision will be added if parent agent has enabled/ toggle switch is on
         
         print(f"📝 Filtering tools for info_extractor profile")
         filtered_files = []
