@@ -52,7 +52,7 @@ class CodeFile(Tool):
     
     async def _create_code_file(self, file_name: str, file_extension: str):
         """Create a new code file."""
-        code_file_dir = get_abs_path("/a0/")
+        code_file_dir = get_abs_path("/root/flows/")
         filename = f"{file_name}{file_extension}"
         current_file = os.path.join(code_file_dir, filename)
         
@@ -64,7 +64,7 @@ class CodeFile(Tool):
     
     async def _write_to_code_file(self, file_name: str, content: str):
         """Write content to the current code_file file."""
-        code_file_dir = get_abs_path("/a0/")
+        code_file_dir = get_abs_path("/root/flows/")
         current_file = os.path.join(code_file_dir, file_name)
         if not current_file:
             return Response(message="No code file created. Use 'create' action first.", break_loop=False)
@@ -78,7 +78,7 @@ class CodeFile(Tool):
     
     async def _read_code_file(self, file_name: str):
         """Read the current code file content."""
-        code_file_dir = get_abs_path("/a0/")
+        code_file_dir = get_abs_path("/root/flows/")
         current_file = os.path.join(code_file_dir, file_name)
         if not current_file or not os.path.exists(current_file):
             return Response(message="No code file found or file doesn't exist.", break_loop=False)
@@ -124,7 +124,7 @@ class CodeFile(Tool):
     
     async def _clear_code_file(self, file_name: str):
         """Clear the current code file content."""
-        code_file_dir = get_abs_path("/a0/")
+        code_file_dir = get_abs_path("/root/")
         current_file = os.path.join(code_file_dir, file_name)
         if not current_file:
             return Response(message="No code file created.", break_loop=False)
@@ -136,7 +136,7 @@ class CodeFile(Tool):
     
     async def _list_code_files(self):
         """List all code files."""
-        code_file_dir = get_abs_path("/a0/")
+        code_file_dir = get_abs_path("/root/flows/")
         if not os.path.exists(code_file_dir):
             return Response(message="No code directory found.", break_loop=False)
             

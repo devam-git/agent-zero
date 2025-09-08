@@ -14,7 +14,6 @@ import models
 from python.helpers import extract_tools, files, errors, history, tokens
 from python.helpers import dirty_json
 from python.helpers.print_style import PrintStyle
-from python.helpers.langfuse_tracer import trace_conversation_async
 from langchain_core.prompts import (
     ChatPromptTemplate,
 )

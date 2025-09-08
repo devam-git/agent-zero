@@ -22,12 +22,10 @@ class FlowBuilderTools(VariablesPlugin):
         
         # Define allowed default tools for flow_builder
         allowed_tools = [
-            'behaviour_adjustment',
             'code_execution_tool', 
             'input',
             'response',
             'search_engine',
-            'todo_list',
             'memory'
         ]
         

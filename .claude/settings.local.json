@@ -22,7 +22,8 @@
       "Read(c:\\devam\\agent-zero\\agents\\info_extractor\\prompts/**)",
       "Read(c:\\devam\\agent-zero\\agents\\info_extractor\\prompts/**)",
       "Read(c:\\devam\\agent-zero\\agents\\unspc_classifier\\prompts/**)",
-      "Read(c:\\devam\\agent-zero\\agents\\unspc_classifier\\prompts/**)"
+      "Read(c:\\devam\\agent-zero\\agents\\unspc_classifier\\prompts/**)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "ask": []

@@ -3,6 +3,7 @@
 execute terminal commands python nodejs code for computation or software tasks
 place code in "code" arg; escape carefully and indent properly
 select "runtime" arg: "terminal" "python" "nodejs" "output" "reset"
+to run/execute an existing python file select "runtime":"terminal" and "code":"python <path-to-file>"
 select "session" number, 0 default, others for multitasking
 if code runs long, use "output" to wait, "reset" to kill process
 use "pip" "npm" "apt-get" in "terminal" to install packages
@@ -29,6 +30,24 @@ usage:
         "runtime": "python",
         "session": 0,
         "code": "import os\nprint(os.getcwd())",
+    }
+}
+~~~
+
+1.1 execute existing python file
+~~~json
+{
+    "thoughts": [
+        "Need to do...",
+        "I can use...",
+        "Then I can...",
+    ],
+    "headline": "Executing existing Python file to check current directory",
+    "tool_name": "code_execution_tool",
+    "tool_args": {
+        "runtime": "terminal",
+        "session": 0,
+        "code": "python <file-path>",
     }
 }
 ~~~

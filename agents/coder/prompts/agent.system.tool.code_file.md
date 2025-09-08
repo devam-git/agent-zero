@@ -1,16 +1,15 @@
 ### code_file:
 
-Create and manage a code file for code development and testing.
+Create and manage a code file for code development.
+**CANNOT RUN/EXECUTE CODE FILES. USE code_execution_tool FOR THAT**
 
 **When to use 'code_file':**
-1. You want to create a file to write and test code in the scripts directory.
-2. You need a quick way to experiment with code snippets.
-3. You want to run code and see the output immediately.
-4. You need a development environment for iterative coding.
+1. You want to create a file to write code in the scripts directory.
+2. You need a development scratchpad for iterative coding.
 
 **Parameters**:
 - action: str
-  The action to perform: "create", "write", "read", "run", "clear", "list"
+  The action to perform: "create", "write", "read", "clear", "list"
 - file_name: str (optional)
   The name of the code file to create or work with
 - content: str (optional)
@@ -33,12 +32,10 @@ Create and manage a code file for code development and testing.
 **Error Handling**:
 - Creates scripts directory if it doesn't exist
 - Validates file existence before operations
-- Handles execution timeouts (30 seconds)
 - Provides clear error messages for unsupported file types
 
 **Returns**:
 - Success message with file path and content/result as appropriate
-- Execution output including stdout and stderr
 - File listing for "list" action
 
 **usage**:

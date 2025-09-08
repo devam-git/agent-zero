@@ -8,6 +8,7 @@
 .cursor/
 .claude/
 .vscode/
+.cursorignore
 
 # ignore test files in root dir
 /*.test.py

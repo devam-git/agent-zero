@@ -5,7 +5,6 @@ import functools
 from agent import Agent, LoopData
 from python.helpers.print_style import PrintStyle
 from python.helpers.strings import sanitize_string
-from python.helpers.langfuse_tracer import observe
 
 @dataclass
 class Response:
@@ -22,71 +21,7 @@ class Tool:
         self.loop_data = loop_data
         self.message = message
         
-        # Initialize tracing if not already set
-        from python.helpers.langfuse_tracer import TRACING_ENABLED
-        
-        print(f"[TOOL DEBUG] Tool {self.name} created for {agent.agent_name}")
-        print(f"[TOOL DEBUG] observe available: {observe is not None}")
-        print(f"[TOOL DEBUG] TRACING_ENABLED: {TRACING_ENABLED}")
-        print(f"[TOOL DEBUG] agent has _langfuse_enabled: {hasattr(agent, '_langfuse_enabled')}")
-        
-        if not hasattr(agent, '_langfuse_enabled'):
-            agent._langfuse_enabled = TRACING_ENABLED
-            print(f"[TOOL DEBUG] Set agent._langfuse_enabled = {TRACING_ENABLED}")
-        
-        print(f"[TOOL DEBUG] Final agent._langfuse_enabled: {getattr(agent, '_langfuse_enabled', 'NOT SET')}")
-        
-        # Wrap execute with tracing if available and enabled
-        if observe and agent._langfuse_enabled:
-            self._wrap_with_tracing()
-            print(f"[TOOL DEBUG] Tool {self.name} wrapped with tracing")
-        else:
-            print(f"[TOOL DEBUG] Tool {self.name} NOT wrapped - observe:{observe is not None}, enabled:{agent._langfuse_enabled}")
 
-    def _wrap_with_tracing(self):
-        """Wrap execute method with LangFuse span under main trace"""
-        original_execute = self.execute
-        
-        @functools.wraps(original_execute)
-        async def traced_execute(**kwargs):
-            # Check if we have a main span to attach to
-            if hasattr(self.agent, '_langfuse_main_span') and self.agent._langfuse_main_span:
-                from python.helpers.langfuse_tracer import client
-                if client:
-                    try:
-                        # Create span under main trace using context manager
-                        with client.start_as_current_span(
-                            name=f"Tool: {self.name}",
-                            input={
-                                "tool_name": self.name,
-                                "tool_method": self.method,
-                                "args": {k: (str(v)[:200] if len(str(v)) > 200 else v) 
-                                        for k, v in (self.args or {}).items()}
-                            }
-                        ) as span:
-                            print(f"[LangFuse] Executing tool span: {self.name}")
-                            result = await original_execute(**kwargs)
-                            
-                            # Update span with result
-                            span.update(
-                                output={
-                                    "message": result.message[:500] if len(result.message) > 500 else result.message,
-                                    "break_loop": result.break_loop,
-                                    "success": True
-                                }
-                            )
-                            print(f"[LangFuse] Tool span completed: {self.name}")
-                            return result
-                    except Exception as e:
-                        print(f"[LangFuse] Tool span failed: {self.name} - {e}")
-                        # Still execute the tool even if tracing fails
-                        return await original_execute(**kwargs)
-                else:
-                    return await original_execute(**kwargs)
-            else:
-                return await original_execute(**kwargs)
-        
-        self.execute = traced_execute
 
     @abstractmethod
     async def execute(self, **kwargs) -> Response:

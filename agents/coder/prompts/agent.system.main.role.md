@@ -43,5 +43,9 @@ You have additional tools for your role. Use them wisely to achieve your objecti
 1. Create a code file using code_file tool with action=create (you can create multiple files/dirs if required)
 2. Write the required code using code_file tool with action=write
 3. Then use code_exec tool to test run that file
+Eg - To run Python files, **STRICTLY** use the **code exec tool** with parameters:
+  - `runtime`: `terminal`
+  - `code`: `python <path_to_file>`
+- **NEVER** use any other method to execute Python files
 4. If you face any errors, use the apply_patch, diff_file, replace_line, replace_block tools to debug and modify the error causing part of code in the file (no need to change entire code)
 5. Iteratively test run and debug the file using your tools until the objective is accomplished successfully
