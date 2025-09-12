@@ -11,6 +11,14 @@ from enum import Enum
 import uuid
 import models
 
+# Langfuse imports
+try:
+    from langfuse import get_client
+    LANGFUSE_AVAILABLE = True
+except ImportError:
+    LANGFUSE_AVAILABLE = False
+    print("Langfuse not available - tracing disabled")
+
 from python.helpers import extract_tools, files, errors, history, tokens
 from python.helpers import dirty_json
 from python.helpers.print_style import PrintStyle
@@ -177,7 +185,20 @@ class AgentContext:
                     Agent.DATA_NAME_SUPERIOR, None
                 )
         else:
-            self.task = self.run_task(self._process_chain, current_agent, msg)
+            # Start Langfuse trace for the conversation
+            if LANGFUSE_AVAILABLE:
+                langfuse = get_client()
+                # Create a unique, meaningful trace name
+                chat_name = self.name or f"Chat #{self.no}"
+                trace_name = f"{chat_name}"  # Simple but unique
+                
+                with langfuse.start_as_current_span(name=trace_name) as span:
+                    span.update(input=msg.message)
+                    # Store span for later updates
+                    current_agent.data["langfuse_conversation_span"] = span
+                    self.task = self.run_task(self._process_chain, current_agent, msg)
+            else:
+                self.task = self.run_task(self._process_chain, current_agent, msg)
 
         return self.task
 
@@ -205,6 +226,12 @@ class AgentContext:
             superior = agent.data.get(Agent.DATA_NAME_SUPERIOR, None)
             if superior:
                 response = await self._process_chain(superior, response, False)  # type: ignore
+            
+            # Flush Langfuse data when conversation completes
+            if LANGFUSE_AVAILABLE and user:  # Only flush at top level
+                langfuse = get_client()
+                langfuse.flush()
+            
             return response
         except Exception as e:
             agent.handle_critical_exception(e)
@@ -621,18 +648,42 @@ class Agent:
     ):
         model = self.get_utility_model()
 
+        # Add Langfuse tracing for utility model calls
+        if LANGFUSE_AVAILABLE and not background:
+            langfuse = get_client()
+            with langfuse.start_as_current_generation(
+                name="utility-llm", 
+                model=self.config.utility_model.name
+            ) as generation:
+                # Extract just the task from system prompt for cleaner logging
+                task_description = system.split('\n')[0] if system else "Utility task"
+                generation.update(input=f"{task_description[:100]}")
+                
+                # propagate stream to callback if set
+                async def stream_callback(chunk: str, total: str):
+                    if callback:
+                        await callback(chunk)
 
-        # propagate stream to callback if set
-        async def stream_callback(chunk: str, total: str):
-            if callback:
-                await callback(chunk)
+                response, _reasoning = await model.unified_call(
+                    system_message=system,
+                    user_message=message,
+                    response_callback=stream_callback,
+                    rate_limiter_callback=self.rate_limiter_callback if not background else None,
+                )
+                
+                generation.update(output=response)
+        else:
+            # propagate stream to callback if set
+            async def stream_callback(chunk: str, total: str):
+                if callback:
+                    await callback(chunk)
 
-        response, _reasoning = await model.unified_call(
-            system_message=system,
-            user_message=message,
-            response_callback=stream_callback,
-            rate_limiter_callback=self.rate_limiter_callback if not background else None,
-        )
+            response, _reasoning = await model.unified_call(
+                system_message=system,
+                user_message=message,
+                response_callback=stream_callback,
+                rate_limiter_callback=self.rate_limiter_callback if not background else None,
+            )
 
         return response
 
@@ -648,13 +699,49 @@ class Agent:
         # model class
         model = self.get_chat_model()
 
-        # call model
-        response, reasoning = await model.unified_call(
-            messages=messages,
-            reasoning_callback=reasoning_callback,
-            response_callback=response_callback,
-            rate_limiter_callback=self.rate_limiter_callback if not background else None,
-        )
+        # Add Langfuse tracing for LLM generation
+        if LANGFUSE_AVAILABLE and not background:
+            langfuse = get_client()
+            with langfuse.start_as_current_generation(
+                name="llm-response", 
+                model=self.config.chat_model.name
+            ) as generation:
+                # Extract input from messages for tracing with smart truncation
+                input_text = ""
+                for msg in messages:
+                    if hasattr(msg, 'content'):
+                        content = str(msg.content)
+                        # Use regex to stop before "Behaviour Rules" section
+                        import re
+                        match = re.search(r'^(.*?)(?=Behaviour Rules)', content, re.DOTALL | re.IGNORECASE)
+                        if match:
+                            truncated_content = match.group(1).strip()
+                            input_text = truncated_content + "..."
+                        elif len(content) > 150:  # Fallback to length-based truncation
+                            input_text = content[:49] + "..."
+                        else:
+                            input_text = content
+                        break
+                
+                generation.update(input=input_text)
+                
+                # call model
+                response, reasoning = await model.unified_call(
+                    messages=messages,
+                    reasoning_callback=reasoning_callback,
+                    response_callback=response_callback,
+                    rate_limiter_callback=self.rate_limiter_callback if not background else None,
+                )
+                
+                generation.update(output=response)
+        else:
+            # call model without tracing
+            response, reasoning = await model.unified_call(
+                messages=messages,
+                reasoning_callback=reasoning_callback,
+                response_callback=response_callback,
+                rate_limiter_callback=self.rate_limiter_callback if not background else None,
+            )
 
         return response, reasoning
 
@@ -725,15 +812,39 @@ class Agent:
                 )
 
             if tool:
-                await self.handle_intervention()
-                await tool.before_execution(**tool_args)
-                await self.handle_intervention()
-                response = await tool.execute(**tool_args)
-                await self.handle_intervention()
-                await tool.after_execution(response)
-                await self.handle_intervention()
-                if response.break_loop:
-                    return response.message
+                # Add Langfuse tracing for tool execution
+                if LANGFUSE_AVAILABLE:
+                    langfuse = get_client()
+                    with langfuse.start_as_current_span(name=f"tool-{tool_name}") as span:
+                        span.update(input=tool_args)
+                        
+                        await self.handle_intervention()
+                        await tool.before_execution(**tool_args)
+                        await self.handle_intervention()
+                        response = await tool.execute(**tool_args)
+                        await self.handle_intervention()
+                        await tool.after_execution(response)
+                        await self.handle_intervention()
+                        
+                        span.update(output=response.message if hasattr(response, 'message') else str(response))
+                        
+                        # Update conversation span with final output if this breaks the loop
+                        if response.break_loop:
+                            conv_span = self.data.get("langfuse_conversation_span")
+                            if conv_span:
+                                conv_span.update(output=response.message)
+                            langfuse.flush()
+                            return response.message
+                else:
+                    await self.handle_intervention()
+                    await tool.before_execution(**tool_args)
+                    await self.handle_intervention()
+                    response = await tool.execute(**tool_args)
+                    await self.handle_intervention()
+                    await tool.after_execution(response)
+                    await self.handle_intervention()
+                    if response.break_loop:
+                        return response.message
             else:
                 error_detail = (
                     f"Tool '{raw_tool_name}' not found or could not be initialized."

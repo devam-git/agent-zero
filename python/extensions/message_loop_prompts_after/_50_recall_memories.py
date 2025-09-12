@@ -37,6 +37,7 @@ class RecallMemories(Extension):
                 heading="Searching memories...",
             )
 
+            # Create memory search task without tracing yet - we'll set up tracing inside with the actual query
             task = asyncio.create_task(
                 self.search_memories(loop_data=loop_data, log_item=log_item, **kwargs)
             )
@@ -84,6 +85,7 @@ class RecallMemories(Extension):
                     system=system,
                     message=message,
                     callback=log_callback,
+                    background=True,  # Don't trace this utility call - parent memory-search span covers it
                 )
                 query = query.strip()
             except Exception as e:
@@ -111,6 +113,19 @@ class RecallMemories(Extension):
             )
             return
 
+        # Set up Langfuse tracing now that we have the actual query
+        span_context = None
+        try:
+            from langfuse import get_client
+            langfuse = get_client()
+            span_context = langfuse.start_as_current_span(name="memory-search")
+            span = span_context.__enter__()
+            span.update(input=query[:200] + "..." if len(query) > 200 else query)
+            self.agent.set_data("_memory_search_span", span)
+            self.agent.set_data("_memory_search_context", span_context)
+        except ImportError:
+            pass
+
         # get memory database
         db = await Memory.get(self.agent)
 
@@ -134,6 +149,16 @@ class RecallMemories(Extension):
             log_item.update(
                 heading="No memories or solutions found",
             )
+            # Update Langfuse span with no results
+            try:
+                span = self.agent.get_data("_memory_search_span")
+                span_context = self.agent.get_data("_memory_search_context")
+                if span:
+                    span.update(output="No relevant memories or solutions found")
+                if span_context:
+                    span_context.__exit__(None, None, None)
+            except:
+                pass
             return
 
         # if post filtering is enabled
@@ -151,6 +176,7 @@ class RecallMemories(Extension):
                         history=history,
                         message=user_instruction,
                     ),
+                    background=True,  # Don't trace this utility call - parent memory-search span covers it
                 )
                 filter_inds = dirty_json.try_parse(filter)
 
@@ -196,6 +222,29 @@ class RecallMemories(Extension):
 
         memories_txt = "\n\n".join([mem.page_content for mem in memories]) if memories else ""
         solutions_txt = "\n\n".join([sol.page_content for sol in solutions]) if solutions else ""
+
+        # Update Langfuse span with actual found content
+        try:
+            span = self.agent.get_data("_memory_search_span")
+            span_context = self.agent.get_data("_memory_search_context")
+            if span:
+                output_content = ""
+                if memories_txt:
+                    output_content += f"MEMORIES:\n{memories_txt[:300]}..."
+                if solutions_txt:
+                    if output_content:
+                        output_content += f"\n\nSOLUTIONS:\n{solutions_txt[:200]}..."
+                    else:
+                        output_content += f"SOLUTIONS:\n{solutions_txt[:300]}..."
+                
+                if not output_content:
+                    output_content = f"Found {len(memories)} memories and {len(solutions)} solutions"
+                    
+                span.update(output=output_content)
+            if span_context:
+                span_context.__exit__(None, None, None)
+        except:
+            pass
 
         # log the full results
         if memories_txt:

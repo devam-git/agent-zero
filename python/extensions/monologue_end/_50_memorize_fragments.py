@@ -24,7 +24,7 @@ class MemorizeMemories(Extension):
             heading="Memorizing new information...",
         )
 
-        # memorize in background
+        # memorize in background - we'll set up tracing inside with actual conversation content
         task = asyncio.create_task(self.memorize(loop_data, log_item))
         return task
 
@@ -38,6 +38,21 @@ class MemorizeMemories(Extension):
         system = self.agent.read_prompt("memory.memories_sum.sys.md")
         msgs_text = self.agent.concat_messages(self.agent.history)
 
+        # Set up Langfuse tracing now that we have the conversation content
+        span_context = None
+        try:
+            from langfuse import get_client
+            langfuse = get_client()
+            span_context = langfuse.start_as_current_span(name="memory-memorization")
+            span = span_context.__enter__()
+            # Show the conversation being analyzed (truncated)
+            conversation_preview = msgs_text[-500:] if len(msgs_text) > 500 else msgs_text
+            span.update(input=f"Analyzing conversation...")
+            self.agent.set_data("_memorization_span", span)
+            self.agent.set_data("_memorization_context", span_context)
+        except ImportError:
+            pass
+
         # log query streamed by LLM
         async def log_callback(content):
             log_item.stream(content=content)
@@ -47,7 +62,7 @@ class MemorizeMemories(Extension):
             system=system,
             message=msgs_text,
             callback=log_callback,
-            background=True,
+            background=True,  # Don't trace this utility call - parent memory-memorization span covers it
         )
 
         # Add validation and error handling for memories_json
@@ -83,6 +98,16 @@ class MemorizeMemories(Extension):
 
         if not isinstance(memories, list) or len(memories) == 0:
             log_item.update(heading="No useful information to memorize.")
+            # Update Langfuse span with no memorization
+            try:
+                span = self.agent.get_data("_memorization_span")
+                span_context = self.agent.get_data("_memorization_context")
+                if span:
+                    span.update(output="No useful information found to memorize")
+                if span_context:
+                    span_context.__exit__(None, None, None)
+            except:
+                pass
             return
         else:
             memories_txt = "\n\n".join([str(memory) for memory in memories]).strip()
@@ -160,6 +185,22 @@ class MemorizeMemories(Extension):
                     memories_consolidated=total_consolidated,
                     update_progress="none"
                 )
+                
+                # Update Langfuse span with actual memorized content
+                try:
+                    span = self.agent.get_data("_memorization_span")
+                    span_context = self.agent.get_data("_memorization_context")
+                    if span:
+                        # Show what was actually memorized (truncated)
+                        output_content = f"Successfully memorized {total_processed} entries"
+                        if total_consolidated > 0:
+                            output_content += f" ({total_consolidated} consolidated with existing memories)"
+                        output_content += f":\n\n{memories_txt[:400]}..."
+                        span.update(output=output_content)
+                    if span_context:
+                        span_context.__exit__(None, None, None)
+                except:
+                    pass
 
             else:
 
@@ -183,6 +224,21 @@ class MemorizeMemories(Extension):
                 )
                 if rem:
                     log_item.stream(result=f"\nReplaced {len(rem)} previous memories.")
+                
+                # Update Langfuse span with actual memorized content
+                try:
+                    span = self.agent.get_data("_memorization_span")
+                    span_context = self.agent.get_data("_memorization_context")
+                    if span:
+                        output_content = f"Successfully memorized {len(memories)} entries"
+                        if rem:
+                            output_content += f" (replaced {len(rem)} similar memories)"
+                        output_content += f":\n\n{memories_txt[:400]}..."
+                        span.update(output=output_content)
+                    if span_context:
+                        span_context.__exit__(None, None, None)
+                except:
+                    pass
             
 
 
