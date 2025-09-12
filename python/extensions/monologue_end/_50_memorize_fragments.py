@@ -46,8 +46,7 @@ class MemorizeMemories(Extension):
             span_context = langfuse.start_as_current_span(name="memory-memorization")
             span = span_context.__enter__()
             # Show the conversation being analyzed (truncated)
-            conversation_preview = msgs_text[-500:] if len(msgs_text) > 500 else msgs_text
-            span.update(input=f"Analyzing conversation...")
+            span.update(input=f"Analyzing conversation for memories...")
             self.agent.set_data("_memorization_span", span)
             self.agent.set_data("_memorization_context", span_context)
         except ImportError:

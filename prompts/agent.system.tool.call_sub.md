@@ -31,9 +31,13 @@ example usage
     }
 }
 ```
+
+**response handling**
+- you might be part of long chain of subordinates, avoid slow and expensive rewriting subordinate responses, instead use `§§include(<path>)` alias to include the response as is
+
 **Current Agent Info**:
 Agent Number: {{number}}
 Profile: {{profile}}
 
-**Available profiles:**
+**available profiles:**
 {{agent_profiles}}
