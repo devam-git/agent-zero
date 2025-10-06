@@ -1,0 +1,4 @@
+- always double check if you use correct method to import builder module, given in setup guide
+- always stick to the given process flow, do not skip a single step
+- always provide url at the end
+- never make changes to any code files except the file you create

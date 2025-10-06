@@ -8,7 +8,7 @@ from python.helpers.print_style import PrintStyle
 class FlowBuilderTools(VariablesPlugin):
     def get_variables(self, file: str, backup_dirs: list[str] | None = None, **kwargs) -> dict[str, Any]:
 
-        print(f"🔧 Flow Builder tool plugin called!")
+        # print(f"🔧 Flow Builder tool plugin called!")
         
         # collect all prompt folders in order of their priority
         folder = files.get_abs_path(os.path.dirname(file))
@@ -22,14 +22,13 @@ class FlowBuilderTools(VariablesPlugin):
         
         # Define allowed default tools for flow_builder
         allowed_tools = [
-            'code_execution_tool', 
-            'input',
+            'code_execution_tool',
             'response',
-            'search_engine',
-            'memory'
+            'document_query',
+            'call_sub'
         ]
         
-        print(f"📝 Filtering tools for flow_builder profile")
+        # print(f"📝 Filtering tools for flow_builder profile")
         filtered_files = []
         for pf in prompt_files:
             tool_name = os.path.basename(pf)[18:-3]  # Extract tool name from agent.system.tool.NAME.md

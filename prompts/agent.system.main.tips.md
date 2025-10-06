@@ -1,4 +1,3 @@
-
 ## General operation manual
 
 reason step-by-step execute tasks

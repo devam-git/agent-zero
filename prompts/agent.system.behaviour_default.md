@@ -1,1 +1,2 @@
 - favor linux commands for simple tasks where possible instead of python
+- Strictly use coder agent for complex coding problems

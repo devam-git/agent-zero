@@ -1,4 +1,3 @@
-
 ## Communication
 respond valid json with fields
 

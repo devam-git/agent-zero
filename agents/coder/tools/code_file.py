@@ -37,23 +37,33 @@ class CodeFile(Tool):
             if action == "create":
                 return await self._create_code_file(file_name, file_extension)
             elif action == "write":
-                return await self._write_to_code_file(file_name, content)
+                return await self._write_to_code_file(file_name, content, file_extension)
             elif action == "read":
-                return await self._read_code_file(file_name)
+                return await self._read_code_file(file_name, file_extension)
             elif action == "clear":
-                return await self._clear_code_file(file_name)
+                return await self._clear_code_file(file_name, file_extension)
             elif action == "list":
-                return await self._list_code_files(file_name)
+                return await self._list_code_files()
             else:
                 return Response(message=f"Unknown action: {action}. Valid actions: create, write, read, run, clear, list", break_loop=False)
 
         except Exception as e:
             return Response(message=f"Error in code operation: {e}", break_loop=False)
-    
+
+    def _get_full_filename(self, file_name: str, file_extension: str) -> str:
+        """Helper method to get full filename with proper extension handling."""
+        if file_name.endswith(file_extension):
+            return file_name
+        else:
+            return f"{file_name}{file_extension}"
+
     async def _create_code_file(self, file_name: str, file_extension: str):
         """Create a new code file."""
         code_file_dir = get_abs_path("/root/")
-        filename = f"{file_name}{file_extension}"
+        # Ensure directory exists
+        os.makedirs(code_file_dir, exist_ok=True)
+        # Handle file extension properly - don't duplicate if already present
+        filename = self._get_full_filename(file_name, file_extension)
         current_file = os.path.join(code_file_dir, filename)
         
         # Create empty file
@@ -62,24 +72,26 @@ class CodeFile(Tool):
             
         return Response(message=f"Created new code_file: {current_file}", break_loop=False)
     
-    async def _write_to_code_file(self, file_name: str, content: str):
+    async def _write_to_code_file(self, file_name: str, content: str, file_extension: str):
         """Write content to the current code_file file."""
         code_file_dir = get_abs_path("/root/")
-        current_file = os.path.join(code_file_dir, file_name)
+        filename = self._get_full_filename(file_name, file_extension)
+        current_file = os.path.join(code_file_dir, filename)
         if not current_file:
             return Response(message="No code file created. Use 'create' action first.", break_loop=False)
             
         with open(current_file, 'w', encoding='utf-8') as f:
             f.write(content)
             
-        result = f"Content written to: {current_file}\n```"
+        result = f"Content written to: {current_file}"
         
         return Response(message=result, break_loop=False)
     
-    async def _read_code_file(self, file_name: str):
+    async def _read_code_file(self, file_name: str, file_extension: str):
         """Read the current code file content."""
         code_file_dir = get_abs_path("/root/")
-        current_file = os.path.join(code_file_dir, file_name)
+        filename = self._get_full_filename(file_name, file_extension)
+        current_file = os.path.join(code_file_dir, filename)
         if not current_file or not os.path.exists(current_file):
             return Response(message="No code file found or file doesn't exist.", break_loop=False)
             
@@ -122,10 +134,11 @@ class CodeFile(Tool):
     #     except Exception as e:
     #         return Response(message=f"Error running code: {e}", break_loop=False)
     
-    async def _clear_code_file(self, file_name: str):
+    async def _clear_code_file(self, file_name: str, file_extension: str):
         """Clear the current code file content."""
         code_file_dir = get_abs_path("/root/")
-        current_file = os.path.join(code_file_dir, file_name)
+        filename = self._get_full_filename(file_name, file_extension)
+        current_file = os.path.join(code_file_dir, filename)
         if not current_file:
             return Response(message="No code file created.", break_loop=False)
             
@@ -140,7 +153,7 @@ class CodeFile(Tool):
         if not os.path.exists(code_file_dir):
             return Response(message="No code directory found.", break_loop=False)
             
-        files = [f for f in os.listdir(code_file_dir) if f.startswith('code_')]
+        files = [f for f in os.listdir(code_file_dir) if os.path.isfile(os.path.join(code_file_dir, f))]
         if not files:
             return Response(message="No code files found.", break_loop=False)
             

@@ -490,13 +490,16 @@ class LangflowBuilder:
         # Fix: Use correct selected_output based on component type
         selected_output_map = {
             "ChatInput": "message",
-            "Prompt": "prompt", 
+            "Prompt": "prompt",
             "LanguageModel": "text_output",
             "LanguageModelComponent": "text_output",
             "ChatOutput": "message",
             "Agent": "response",
             "Calculator": "component_as_tool",
-            "WebSearch": "component_as_tool" 
+            "WebSearch": "component_as_tool",
+            "If_Else": "true_result",
+            "Type_Convert": "message_output",
+            "File": "message"
         }
         
         selected_output = selected_output_map.get(comp["type"], "message")
@@ -603,23 +606,48 @@ class LangflowBuilder:
             "OpenAI": "text_output",
             "Agent": "response",
             "Calculator": "component_as_tool",
-            "WebSearch": "component_as_tool"
+            "WebSearch": "component_as_tool",
+            "MCPTools": "component_as_tool",
+            "QpiAIMCPTools": "component_as_tool",
+            "If_Else": "true_result",
+            "Type_Convert": "message_output",
+            "File": "message"
         }
-        
+
         input_map = {
-            "LanguageModel": {"message": "input_value", "prompt": "input_value"},
-            "LanguageModelComponent": {"message": "input_value", "prompt": "input_value"},
-            "ChatOutput": {"message": "input_value", "text_output": "input_value", "response": "input_value"},
-            "Agent": {"message": "input_value", "component_as_tool": "tools"}
+            "LanguageModel": {"message": "input_value", "prompt": "input_value", "text": "input_value"},
+            "LanguageModelComponent": {"message": "input_value", "prompt": "input_value", "text": "input_value"},
+            "OpenAI": {"message": "input_value", "prompt": "input_value", "text": "input_value"},
+            "TextOutput": {"message": "input_value", "text_output": "input_value", "text": "input_value", "true_result": "input_value", "false_result": "input_value", "response": "input_value"},
+            "ChatOutput": {"message": "input_value", "text_output": "input_value", "response": "input_value", "text": "input_value", "true_result": "input_value", "false_result": "input_value", "message_output": "input_value", "data_output": "input_value", "dataframe_output": "input_value"},
+            "Agent": {
+                "message": "input_value",
+                "prompt": "system_prompt",
+                "text": "input_value",
+                "component_as_tool": "tools",
+                "tools": "tools"
+            },
+            "Type_Convert": {
+                "message": "input_data",
+                "text": "input_data",
+                "text_output": "input_data",
+                "prompt": "input_data",
+                "response": "input_data",
+                "true_result": "input_data",
+                "false_result": "input_data"
+            }
         }
-        
-        # 🔧 ADD: Dynamic output type mapping
         output_type_map = {
-            "component_as_tool": ["Tool"],  # Tools output Tool type
+            "component_as_tool": ["Tool"],
+            "tools": ["Tool"],
             "message": ["Message"],
             "prompt": ["Message"],
-            "text_output": ["Message"],
-            "response": ["Message"]
+            "response": ["Message"],
+            "true_result": ["Message"],
+            "false_result": ["Message"],
+            "message_output": ["Message"],
+            "data_output": ["Data"],
+            "dataframe_output": ["DataFrame"]
         }
         
         from_output = conn["from_output"] or output_map.get(self._get_component_type(conn["from"]), "message")
@@ -646,21 +674,34 @@ class LangflowBuilder:
         # Special handling for Agent tools input
         if target_component_type == "Agent" and to_input == "tools":
             target_type = "other"
-        
+
+        # Special handling for Type_Convert input_data
+        if target_component_type == "Type_Convert" and to_input == "input_data":
+            target_type = "other"
+
         # Handle input types for different target components
         if target_type == "other":
             if target_component_type == "ChatOutput":
                 input_types = ["Data", "DataFrame", "Message"]
             elif target_component_type == "Agent" and to_input == "tools":
                 input_types = ["Tool"]
+            elif target_component_type == "Type_Convert" and to_input == "input_data":
+                input_types = ["Message", "Data", "DataFrame"]
             else:
                 input_types = ["Message"]
         else:
             input_types = ["Message"]
-        
-        # 🔧 FIX: Use dynamic output types in edge ID
-        edge_id = f"xy-edge__{conn['from']}{{œdataTypeœ:œ{self._get_component_type(conn['from'])}œ,œidœ:œ{conn['from']}œ,œnameœ:œ{from_output}œ,œoutput_typesœ:{json.dumps(source_output_types)}}}-{conn['to']}{{œfieldNameœ:œ{to_input}œ,œidœ:œ{conn['to']}œ,œinputTypesœ:{json.dumps(input_types)},œtypeœ:œ{target_type}œ}}"
-        
+
+        def format_array(arr):
+            """Format array for handle string using œ instead of quotes"""
+            items = ','.join(f'œ{item}œ' for item in arr)
+            return f'[{items}]'
+
+        output_types_str = format_array(source_output_types)
+        input_types_str = format_array(input_types)
+
+        edge_id = f"reactflow__edge-{conn['from']}{{œdataTypeœ:œ{self._get_component_type(conn['from'])}œ,œidœ:œ{conn['from']}œ,œnameœ:œ{from_output}œ,œoutput_typesœ:{output_types_str}}}-{conn['to']}{{œfieldNameœ:œ{to_input}œ,œidœ:œ{conn['to']}œ,œinputTypesœ:{input_types_str},œtypeœ:œ{target_type}œ}}"
+
         return {
             "animated": False,
             "className": "",
@@ -681,9 +722,9 @@ class LangflowBuilder:
             "id": edge_id,
             "selected": False,
             "source": conn["from"],
-            "sourceHandle": f"{{œdataTypeœ: œ{self._get_component_type(conn['from'])}œ, œidœ: œ{conn['from']}œ, œnameœ: œ{from_output}œ, œoutput_typesœ: {json.dumps(source_output_types)}}}",  # 🔧 FIX: Use dynamic types
+            "sourceHandle": f"{{œdataTypeœ:œ{self._get_component_type(conn['from'])}œ,œidœ:œ{conn['from']}œ,œnameœ:œ{from_output}œ,œoutput_typesœ:{output_types_str}}}",
             "target": conn["to"],
-            "targetHandle": f"{{œfieldNameœ: œ{to_input}œ, œidœ: œ{conn['to']}œ, œinputTypesœ: {json.dumps(input_types)}, œtypeœ: œ{target_type}œ}}"
+            "targetHandle": f"{{œfieldNameœ:œ{to_input}œ,œidœ:œ{conn['to']}œ,œinputTypesœ:{input_types_str},œtypeœ:œ{target_type}œ}}"
         }
     
     def _resolve_prompt_input(self, prompt_comp_id: str, from_output: str) -> str:

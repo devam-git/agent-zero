@@ -1,4 +1,4 @@
-# Langflow Builder Reference
+# Builder Instructions
 
 **CRITICAL**: 
 1. Dynamic prompt fields MUST use `input_types: ["Message"]` for connections.
@@ -6,7 +6,6 @@
 3. Always prefer Chat input/output over Text Input/Output.
 
 ## Core Code
-
 ```python
 from builder import LangflowBuilder
 
@@ -33,13 +32,10 @@ builder.connect("input", "prompt")  # Auto-detects handles
 workflow = builder.build()
 
 
-# Save workflow JSON to file
+# Save workflow JSON to file (preserve Unicode characters for edge connections)
 import json
-with open("workflow.json", "w") as f:
-    json.dump(workflow, f, indent=2)
-
-# OR save with custom filename
-builder.save("custom_workflow.json")
+with open("workflow.json", "w", encoding='utf-8') as f:
+    json.dump(workflow, f, indent=2, ensure_ascii=False)
 
 ```
 
@@ -121,184 +117,12 @@ All methods support kwargs for cleaner code:
 ## Connection Patterns
 
 ```
+# Basic Chat
 ChatInput.message → Prompt.{field} → LanguageModel.input_value → ChatOutput.input_value
+
+# File Loading
+File.message → Prompt.{field}
+File.dataframe → Component.data_input
 ```
 
-**For detailed component specifications, see "Component Reference" section.**
-
-## Complex Workflow Examples
-
-### 1. Sequential Processing: Support Ticket Analysis
-
-```python
-# Sequential workflow for support ticket analysis and email drafting
-builder = LangflowBuilder("Support Ticket Email Workflow", "Analyze tickets and draft replies")
-
-# Input: Support ticket
-builder.add_component("ticket_input", "ChatInput", {
-    "input_value": "Customer complaint about login issues...",
-    "sender_name": "Support Agent"
-})
-
-# Dynamic prompt: Analyze ticket
-analyze_template = """Analyze this support ticket and extract key issues:
-{ticket_text}
-
-Provide structured summary with sentiment and priority."""
-
-builder.add_dynamic_prompt("ticket_analyzer", analyze_template, {
-    "ticket_text": builder.create_compatible_field_config("Ticket Text", required=True)
-})
-
-# LLM for analysis
-builder.add_component("analysis_llm", "LanguageModel", {
-    "model_name": "gpt-4o-mini",
-    "temperature": 0.2
-})
-
-# Dynamic prompt: Draft email reply
-email_template = """Based on this ticket analysis, draft a professional reply:
-{analysis_result}
-
-Include empathy, solution steps, and next actions."""
-
-builder.add_dynamic_prompt("email_drafter", email_template, {
-    "analysis_result": builder.create_compatible_field_config("Analysis Result", required=True)
-})
-
-# LLM for email drafting
-builder.add_component("email_llm", "LanguageModel", {
-    "model_name": "gpt-4o-mini", 
-    "temperature": 0.3
-})
-
-# Output: Draft email
-builder.add_component("email_output", "ChatOutput", {
-    "sender_name": "Email Draft"
-})
-
-# Sequential connections: Input → Analysis → Email → Output
-builder.connect("ticket_input", "ticket_analyzer", "message", "ticket_text")
-builder.connect("ticket_analyzer", "analysis_llm")
-builder.connect("analysis_llm", "email_drafter", "text_output", "analysis_result") 
-builder.connect("email_drafter", "email_llm")
-builder.connect("email_llm", "email_output")
-```
-
-### 2. Parallel Processing: Multi-Agent Research Pipeline
-
-```python
-# Complex research workflow with parallel analysis and synthesis
-builder = LangflowBuilder(
-    workflow_name="Research Analysis Pipeline",
-    workflow_description="Multi-agent research with parallel processing",
-    spacing=400
-)
-
-# Inputs
-builder.add_component("topic_input", "ChatInput", {
-    "input_value": "AI impact on education",
-    "sender_name": "Researcher"
-})
-
-builder.add_component("requirements_input", "ChatInput", {
-    "input_value": "Focus on pedagogy, outcomes, ethics",
-    "sender_name": "Research Director"
-})
-
-# Research planner with advanced dynamic prompt
-planning_template = """Create research plan for: {research_topic}
-Requirements: {research_requirements}
-Depth: {analysis_depth}
-
-Provide structured plan with questions, methodology, deliverables."""
-
-builder.add_dynamic_prompt("research_planner", planning_template, {
-    "research_topic": {"display_name": "Topic", "required": True, "multiline": True},
-    "research_requirements": {"display_name": "Requirements", "required": True, "multiline": True},
-    "analysis_depth": {
-        "display_name": "Analysis Depth",
-        "options": ["Surface-level", "Moderate", "Deep-dive", "Comprehensive"],
-        "default_value": "Comprehensive"
-    }
-})
-
-builder.add_component("planner_llm", "LanguageModel", {
-    "model_name": "gpt-4o",
-    "temperature": 0.3
-})
-
-# Parallel analysis agents
-technical_template = """Technical analysis of: {research_plan}
-Style: {analysis_style}
-
-Focus on implementation, infrastructure, tech challenges."""
-
-builder.add_dynamic_prompt("technical_analyst", technical_template, {
-    "research_plan": {"display_name": "Research Plan", "required": True, "multiline": True},
-    "analysis_style": {
-        "options": ["Practical", "Theoretical", "Hybrid"],
-        "default_value": "Hybrid"
-    }
-})
-
-social_template = """Social impact analysis of: {research_plan}
-Perspective: {perspective}
-
-Cover stakeholders, benefits, risks, community impact."""
-
-builder.add_dynamic_prompt("social_analyst", social_template, {
-    "research_plan": {"display_name": "Research Plan", "required": True, "multiline": True},
-    "perspective": {
-        "options": ["Conservative", "Progressive", "Balanced", "Critical"],
-        "default_value": "Balanced"
-    }
-})
-
-# Parallel LLMs
-builder.add_component("technical_llm", "LanguageModel", {"model_name": "gpt-4o-mini"})
-builder.add_component("social_llm", "LanguageModel", {"model_name": "gpt-4o-mini"})
-
-# Synthesis agent
-synthesis_template = """Synthesize research findings:
-Technical: {technical_findings}
-Social: {social_findings}
-
-Create unified analysis with themes, conclusions, recommendations."""
-
-builder.add_dynamic_prompt("synthesis_agent", synthesis_template, {
-    "technical_findings": builder.create_compatible_field_config("Technical Analysis"),
-    "social_findings": builder.create_compatible_field_config("Social Analysis")
-})
-
-builder.add_component("synthesis_llm", "LanguageModel", {"model_name": "gpt-4o"})
-builder.add_component("final_output", "ChatOutput", {"sender_name": "Research System"})
-
-# Connection flow
-# Inputs to planner
-builder.connect("topic_input", "research_planner", "message", "research_topic")
-builder.connect("requirements_input", "research_planner", "message", "research_requirements")
-builder.connect("research_planner", "planner_llm")
-
-# Parallel distribution to analysts
-builder.connect("planner_llm", "technical_analyst", "text_output", "research_plan")
-builder.connect("planner_llm", "social_analyst", "text_output", "research_plan")
-
-# Parallel analysis
-builder.connect("technical_analyst", "technical_llm")
-builder.connect("social_analyst", "social_llm")
-
-# Synthesis convergence
-builder.connect("technical_llm", "synthesis_agent", "text_output", "technical_findings")
-builder.connect("social_llm", "synthesis_agent", "text_output", "social_findings")
-builder.connect("synthesis_agent", "synthesis_llm")
-builder.connect("synthesis_llm", "final_output")
-```
-
-**Key Patterns Demonstrated:**
-- **Sequential Processing**: Linear workflow with step-by-step dependencies
-- **Parallel Processing**: Multiple analysis paths that converge for synthesis
-- **Dynamic Prompts**: Advanced field configurations with dropdowns and validation
-- **Mixed LLM Strategy**: Different models for different complexity levels (GPT-4o for planning/synthesis, GPT-4o-mini for analysis)
-- **Flexible Connections**: Auto-detection and explicit handle specification
-- **Helper Methods**: `create_compatible_field_config()` for guaranteed compatibility
+**For detailed component specifications, use document_query tool on `/a0/flow_builder/component_registry.md`.**

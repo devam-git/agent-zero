@@ -1,7 +1,7 @@
-# Hierarchical Agent Workflow Documentation
+# Hierarchical Agent 
 
 ## Overview
-This document explains how to create hierarchical agent workflows in Langflow where a manager agent orchestrates multiple sub-agents that function as specialized tools.
+This section explains how to create hierarchical agent workflows in Langflow where a manager agent orchestrates multiple sub-agents that function as specialized tools.
 
 ## Architecture Pattern
 
@@ -178,8 +178,7 @@ Create deeper hierarchies by making agents that are both tools and managers:
 ### Debugging Tips
 1. Test each sub-agent individually first
 2. Verify tool connections with simple tasks
-3. Monitor token usage with complex hierarchies
-4. Use detailed logging in system prompts
+3. Use detailed logging in system prompts
 
 ## Example Implementations
 See `/a0/flow_builder/builder_examples/` directory for complete working examples of hierarchical agent patterns.

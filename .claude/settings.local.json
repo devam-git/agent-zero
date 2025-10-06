@@ -23,9 +23,17 @@
       "Read(c:\\devam\\agent-zero\\agents\\info_extractor\\prompts/**)",
       "Read(c:\\devam\\agent-zero\\agents\\unspc_classifier\\prompts/**)",
       "Read(c:\\devam\\agent-zero\\agents\\unspc_classifier\\prompts/**)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "WebFetch(domain:docs.langflow.org)",
+      "WebFetch(domain:smithery.ai)",
+      "Bash(python test_mcp_http.py)",
+      "Read(//c/Users/devam.s/Downloads/**)",
+      "Bash(python:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "outputStyle": "Explanatory"
 }
